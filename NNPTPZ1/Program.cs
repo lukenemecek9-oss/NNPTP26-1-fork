@@ -42,12 +42,12 @@ namespace NNPTPZ1
 
             string output = args[6];
 
-            Bitmap bitmap = new Bitmap(width, height);
+            Bitmap bitmap = CreateBitmap(width, height);
 
-            double xstep = (xmax - xmin) / width;
-            double ystep = (ymax - ymin) / height;
+            double xstep, ystep;
+            CalculateSteps(width, height, xmin, xmax, ymin, ymax, out xstep, out ystep);
 
-            List<Cplx> koreny = new List<Cplx>();
+            List<Cplx> koreny = CreateRootsList();
 
             double coefficient1, coefficient2, coefficient3, coefficient4;
             if (!TryParsePolynomialCoefficients(args, out coefficient1, out coefficient2, out coefficient3, out coefficient4))
@@ -56,22 +56,63 @@ namespace NNPTPZ1
                 return;
             }
 
-            Poly polynomial = new Poly();
+            Poly polynomial = CreatePolynomial();
             PolynomialCoeficientAddition(coefficient1, coefficient2, coefficient3, coefficient4, polynomial);
             Poly polynomialDerivative = polynomial.Derive();
 
             Console.WriteLine(polynomial);
             Console.WriteLine(polynomialDerivative);
 
-            var colorsPalette = new Color[]
-            {
-                Color.Red, Color.Blue, Color.Green, Color.Yellow, Color.Orange, Color.Fuchsia, Color.Gold, Color.Cyan, Color.Magenta
-            };
+            Color[] colorPalette = CreateColorPalette();
 
-            var maxid = 0;
+            const float MinimalValueFloat = 0.0001f;
+            const double MinimalValueDouble = 0.0001;
 
-            // TODO: cleanup!!!
             // for every pixel in image...
+            ProcessPixels(width, height, xmin, ymin, bitmap, xstep, ystep, koreny, polynomial, polynomialDerivative, colorPalette, MinimalValueFloat, MinimalValueDouble);
+
+            bitmap.Save(output ?? "../../../out.png");
+        }
+
+        private static Color[] CreateColorPalette()
+        {
+            return new Color[]
+            {
+                Color.Red, 
+                Color.Blue, 
+                Color.Green, 
+                Color.Yellow, 
+                Color.Orange, 
+                Color.Fuchsia,
+                Color.Gold,
+                Color.Cyan, 
+                Color.Magenta
+            };
+        }
+
+        private static Bitmap CreateBitmap(int width, int height)
+        {
+            return new Bitmap(width, height);
+        }
+
+        private static Poly CreatePolynomial()
+        {
+            return new Poly();
+        }
+
+        private static List<Cplx> CreateRootsList()
+        {
+            return new List<Cplx>();
+        }
+
+        private static void CalculateSteps(int width, int height, double xmin, double xmax, double ymin, double ymax, out double xstep, out double ystep)
+        {
+            xstep = (xmax - xmin) / width;
+            ystep = (ymax - ymin) / height;
+        }
+
+        private static void ProcessPixels(int width, int height, double xmin, double ymin, Bitmap bitmap, double xstep, double ystep, List<Cplx> koreny, Poly polynomial, Poly polynomialDerivative, Color[] colorsPalette, float MinimalValueFloat, double MinimalValueDouble)
+        {
             for (int i = 0; i < width; i++)
             {
                 for (int j = 0; j < height; j++)
@@ -80,83 +121,83 @@ namespace NNPTPZ1
                     double y = ymin + i * ystep;
                     double x = xmin + j * xstep;
 
-                    Cplx ox = new Cplx()
+
+                    Cplx complexNumber = new Cplx()
                     {
                         Real = x,
                         Imaginary = (float)(y)
                     };
 
-                    if (ox.Real == 0)
-                        ox.Real = 0.0001;
-                    if (ox.Imaginary == 0)
-                        ox.Imaginary = 0.0001f;
+                    CheckForMinimalValue(MinimalValueFloat, MinimalValueDouble, complexNumber);
 
-                    //Console.WriteLine(ox);
+                    //Console.WriteLine(complexNumber);
 
                     // find solution of equation using newton's iteration
-                    float it = 0;
-                    for (int q = 0; q < 30; q++)
-                    {
-                        var diff = polynomial.Eval(ox).Divide(polynomialDerivative.Eval(ox));
-                        ox = ox.Subtract(diff);
-
-                        //Console.WriteLine($"{q} {ox} -({diff})");
-                        if (Math.Pow(diff.Real, 2) + Math.Pow(diff.Imaginary, 2) >= 0.5)
-                        {
-                            q--;
-                        }
-                        it++;
-                    }
-
-                    //float newtonsIterations = FindSolutionUsingNewtonsIteration(polynomial, polynomialDerivative, ref ox);
-
-                    //Console.ReadKey();
+                    float iterationCount = FindSolutionUsingNewtonsIteration(polynomial, polynomialDerivative, ref complexNumber);
 
                     // find solution root number
-                    var known = false;
-                    var id = 0;
-                    for (int w = 0; w < koreny.Count; w++)
-                    {
-                        if (Math.Pow(ox.Real - koreny[w].Real, 2) + Math.Pow(ox.Imaginary - koreny[w].Imaginary, 2) <= 0.01)
-                        {
-                            known = true;
-                            id = w;
-                        }
-                    }
-                    if (!known)
-                    {
-                        koreny.Add(ox);
-                        id = koreny.Count;
-                        maxid = id + 1;
-                    }
-
-                    //int rootNumber = FindRootNumber(koreny, ref maxid, ox);
+                    int rootNumber = FindSolutionUsingRootNumber(koreny, complexNumber);
 
                     // colorize pixel according to root number
-                    //int vv = rootNumber;
-                    //int vv = rootNumber * 50 + (int)newtonsIterations*5;
-                    var vv = colorsPalette[id % colorsPalette.Length];
-                    vv = Color.FromArgb(vv.R, vv.G, vv.B);
-                    vv = Color.FromArgb(Math.Min(Math.Max(0, vv.R - (int)it * 2), 255), Math.Min(Math.Max(0, vv.G - (int)it * 2), 255), Math.Min(Math.Max(0, vv.B - (int)it * 2), 255));
-                    //vv = Math.Min(Math.Max(0, vv), 255);
-                    bitmap.SetPixel(j, i, vv);
-                    //bmp.SetPixel(j, i, Color.FromArgb(vv, vv, vv));
+                    ColorizePixelAccordingToRootNumber(bitmap, colorsPalette, i, j, iterationCount, rootNumber);
                 }
             }
+        }
 
-            // TODO: delete I suppose...
-            //for (int i = 0; i < 300; i++)
-            //{
-            //    for (int j = 0; j < 300; j++)
-            //    {
-            //        Color c = bitmap.GetPixel(j, i);
-            //        int nv = (int)Math.Floor(c.R * (255.0 / maxid));
-            //        bitmap.SetPixel(j, i, Color.FromArgb(nv, nv, nv));
-            //    }
-            //}
+        private static void CheckForMinimalValue(float MinimalValueFloat, double MinimalValueDouble, Cplx ComplexNumber)
+        {
+            if (ComplexNumber.Real == 0)
+                ComplexNumber.Real = MinimalValueDouble;
+            if (ComplexNumber.Imaginary == 0)
+                ComplexNumber.Imaginary = MinimalValueFloat;
+        }
 
-            bitmap.Save(output ?? "../../../out.png");
-            //Console.ReadKey();
+        private static void ColorizePixelAccordingToRootNumber(Bitmap bitmap, Color[] colorsPalette, int i, int j, float newtonsIteration, int id)
+        {
+            var vv = colorsPalette[id % colorsPalette.Length];
+            vv = Color.FromArgb(vv.R, vv.G, vv.B);
+            vv = Color.FromArgb(Math.Min(Math.Max(0, vv.R - (int)newtonsIteration * 2), 255), Math.Min(Math.Max(0, vv.G - (int)newtonsIteration * 2), 255), Math.Min(Math.Max(0, vv.B - (int)newtonsIteration * 2), 255));
+            bitmap.SetPixel(j, i, vv);
+        }
+
+        private static int FindSolutionUsingRootNumber(List<Cplx> koreny, Cplx ox)
+        {
+            var known = false;
+            var id = 0;
+            for (int w = 0; w < koreny.Count; w++)
+            {
+                if (Math.Pow(ox.Real - koreny[w].Real, 2) + Math.Pow(ox.Imaginary - koreny[w].Imaginary, 2) <= 0.01)
+                {
+                    known = true;
+                    id = w;
+                }
+            }
+            if (!known)
+            {
+                koreny.Add(ox);
+                id = koreny.Count;
+            }
+
+            return id;
+        }
+
+        private static float FindSolutionUsingNewtonsIteration(Poly polynomial, Poly polynomialDerivative, ref Cplx ox)
+        {
+            float it = 0;
+            for (int q = 0; q < 30; q++)
+            {
+                var diff = polynomial.Eval(ox).Divide(polynomialDerivative.Eval(ox));
+                ox = ox.Subtract(diff);
+
+                //Console.WriteLine($"{q} {complexNumber} -({diff})");
+                if (Math.Pow(diff.Real, 2) + Math.Pow(diff.Imaginary, 2) >= 0.5)
+                {
+                    q--;
+                }
+                it++;
+            }
+
+            return it;
         }
 
         private static void PolynomialCoeficientAddition(double coefficient1, double coefficient2, double coefficient3, double coefficient4, Poly polynomial)
