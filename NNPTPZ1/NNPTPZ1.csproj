@@ -44,11 +44,17 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="FractalEnvironment.cs" />
+    <Compile Include="FractalRenderer.cs" />
+    <Compile Include="Mathematics\ComplexNumber.cs" />
+    <Compile Include="Mathematics\Polynomial.cs" />
     <Compile Include="Program.cs" />
+    <Compile Include="ProgramArguments.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
