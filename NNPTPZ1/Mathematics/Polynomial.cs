@@ -90,7 +90,7 @@ namespace NNPTPZ1
                         int j = 0;
                         for (; j < i; j++)
                         {
-                            str += "pointOfEvaluation";
+                            str += "x";
                         }
                     }
                     if (i + 1 < Coeficient.Count)
